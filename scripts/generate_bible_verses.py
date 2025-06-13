@@ -33,15 +33,16 @@ BOOK_DIVIDERS = {
     "The New Testament of the King James Version of the Bible",
 }
 
-BOOK_RE   = re.compile(r"^\s*(?:(?:The\s+)?[A-Z][A-Za-z\s]+?)\s*$")
+BOOK_RE   = re.compile(r"^\s*(?:The\s+First|The\s+Second|The\s+Third)?\s*(?:[A-Z][A-Za-z\s]+?)\s*$")
 VERSE_RE  = re.compile(r"^\s*(\d+):(\d+)\s+(.+?)\s*$")
 
 def canonical_book(name: str) -> str:
     """Strip verbose prefixes -> 'Genesis', 'John', '1 Peter', etc."""
     if ':' in name:
-        # "The First Book of Moses: Called Genesis" → "Genesis"
         name = name.split(':')[-1]
     name = name.replace("The Book of ", "")
+    name = name.replace("The Epistle of Paul the Apostle to the ", "")
+    name = name.replace("The General Epistle of ", "")
     name = name.replace("The Epistle of ", "")
     name = name.replace("The Gospel According to ", "")
     name = name.replace("Called ", "")
@@ -49,10 +50,12 @@ def canonical_book(name: str) -> str:
 
 def fetch_pg10() -> str:
     if LOCAL_RAW.exists():
+        print(f"Using local cache file: {LOCAL_RAW}")
         return LOCAL_RAW.read_text(encoding="utf-8", errors="ignore")
 
+    print(f"Fetching KJV text from {URL}...")
     ctx = None
-    try:                                # secure attempt
+    try:
         import certifi
         ctx = ssl.create_default_context(cafile=certifi.where())
     except ImportError:
@@ -60,64 +63,52 @@ def fetch_pg10() -> str:
 
     try:
         with urlopen(URL, context=ctx) as r:
-            return r.read().decode("utf-8", errors="ignore")
+            content = r.read().decode("utf-8", errors="ignore")
+            # Cache it locally for next time
+            LOCAL_RAW.write_text(content, encoding="utf-8")
+            return content
     except URLError as e:
         raise SystemExit(f"Download failed: {e.reason}")
 
-def strip_header(txt: str) -> str:
-    s, e = txt.find("*** START OF"), txt.find("*** END OF")
-    return txt[s:e] if s != -1 < e else txt
+def strip_gutenberg_header_footer(txt: str) -> str:
+    start_marker = "*** START OF THE PROJECT GUTENBERG EBOOK THE KING JAMES BIBLE ***"
+    end_marker = "*** END OF THE PROJECT GUTENBERG EBOOK THE KING JAMES BIBLE ***"
+    s_idx = txt.find(start_marker)
+    e_idx = txt.find(end_marker)
+    if s_idx != -1:
+        txt = txt[s_idx + len(start_marker):]
+    if e_idx != -1:
+        txt = txt[:e_idx]
+    return txt
 
-# --------------------------------------------------------------------------
 def parse_verses(raw: str):
-    """Yield tuples (book, chapter:verse, text)."""
     book_long = None
-    verse_text = []
-    chap_verse = None
-
     lines = raw.splitlines()
     i = 0
     while i < len(lines):
-        line = lines[i].rstrip()
-        if not line:
-            i += 1; continue
-
-        # Divider headings? skip.
-        if line.strip() in BOOK_DIVIDERS:
-            i += 1; continue
-
-        # Book heading?
-        if BOOK_RE.match(line) and not ':' in line.strip() and not VERSE_RE.match(lines[i+1].strip()):
-            book_long = canonical_book(line.strip())
-            i += 1; continue
-
-        # Verse start?
-        m = VERSE_RE.match(line)
-        if m and book_long:
-            # flush previous pending verse
-            if verse_text and chap_verse:
-                yield book_long, chap_verse, " ".join(verse_text).strip()
-            chap_verse = f"{m.group(1)}:{m.group(2)}"
-            verse_text = [m.group(3)]
-            i += 1
-            # collect continuation lines
-            while i < len(lines):
-                nxt = lines[i].rstrip()
-                if not nxt or VERSE_RE.match(nxt) or BOOK_RE.match(nxt):
-                    break
-                verse_text.append(nxt.strip())
-                i += 1
+        line = lines[i].strip()
+        i += 1
+        if not line or line in BOOK_DIVIDERS:
             continue
 
-        i += 1
+        m = VERSE_RE.match(line)
+        if m and book_long:
+            chap_verse = f"{m.group(1)}:{m.group(2)}"
+            verse_text = [m.group(3).strip()]
 
-    # emit last verse
-    if verse_text and chap_verse:
-        yield book_long, chap_verse, " ".join(verse_text).strip()
+            # Look ahead for continuation lines
+            while i < len(lines) and lines[i].strip() and not VERSE_RE.match(lines[i]) and not BOOK_RE.match(lines[i]):
+                verse_text.append(lines[i].strip())
+                i += 1
 
-# --------------------------------------------------------------------------
+            yield book_long, chap_verse, " ".join(verse_text)
+        elif BOOK_RE.match(line):
+             # Check if the next line is a verse to avoid misinterpreting text as a book title
+            if i < len(lines) and VERSE_RE.match(lines[i]):
+                book_long = canonical_book(line)
+
 def build_records():
-    raw = strip_header(fetch_pg10())
+    raw = strip_gutenberg_header_footer(fetch_pg10())
     for book, ref, text in parse_verses(raw):
         if len(text.split()) <= MAX_WORDS:
             yield {
@@ -133,7 +124,7 @@ def main():
     recs = list(build_records())
     with DATA_FILE.open("w", encoding="utf-8") as f:
         json.dump(recs, f, ensure_ascii=False, indent=2)
-    print(f"✅  {len(recs):,} verses saved → {DATA_FILE.relative_to(ROOT)}")
+    print(f"✅  {len(recs):,} verses (max {MAX_WORDS} words) saved to {DATA_FILE.relative_to(ROOT)}")
 
 if __name__ == "__main__":
     main()
