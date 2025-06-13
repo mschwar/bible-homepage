@@ -11,7 +11,7 @@ To create a peaceful digital threshold — a homepage that offers a moment for t
 ## Live Demo
 
 You can view and use the live version here:
-[https://your-github-username.github.io/bible-homepage/](https://your-github-username.github.io/bible-homepage/)
+[https://mschwar.github.io/bible-homepage/]
 *(Note: Replace with your actual GitHub Pages URL after deploying.)*
 
 ## Key Features
