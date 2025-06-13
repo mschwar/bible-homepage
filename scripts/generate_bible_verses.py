@@ -1,84 +1,81 @@
+#!/usr/bin/env python3
+"""
+scrape_kjv_bible_pg.py
+----------------------
+Download Project Gutenberg’s public-domain KJV Bible and export a JSON list of
+verses with ≤ 75 words in the unified quote schema.
+
+Usage:
+    python scrape_kjv_bible_pg.py
+"""
 import json
-import os
+import re
+import textwrap
+from pathlib import Path
+from urllib.request import urlopen
 
-# --- Configuration ---
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
-OUTPUT_QUOTES_PATH = os.path.join(PROJECT_ROOT, 'data', 'quotes_bible.json')
+# ---------------------------------------------------------------------------
+SOURCE_URL   = "https://www.gutenberg.org/cache/epub/10/pg10.txt"
+OUT_PATH     = Path("data/quotes_kjv.json")
+MAX_WORDS    = 75
+AUTHOR_STR   = "Various (King James Version)"
+TRADITION    = "Christianity/Judaism"
+# ---------------------------------------------------------------------------
 
-# --- Curated List of Bible Verses ---
-# Add or remove verses here.
-# The structure is a list of dictionaries, each with "text" and "source".
-verses = [
-    {
-        "text": "For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life.",
-        "source": "John 3:16"
-    },
-    {
-        "text": "I can do all this through him who gives me strength.",
-        "source": "Philippians 4:13"
-    },
-    {
-        "text": "The Lord is my shepherd, I lack nothing.",
-        "source": "Psalm 23:1"
-    },
-    {
-        "text": "Trust in the Lord with all your heart and lean not on your own understanding; in all your ways submit to him, and he will make your paths straight.",
-        "source": "Proverbs 3:5-6"
-    },
-    {
-        "text": "For I know the plans I have for you,” declares the Lord, “plans to prosper you and not to harm you, plans to give you hope and a future.",
-        "source": "Jeremiah 29:11"
-    },
-    {
-        "text": "Be still, and know that I am God.",
-        "source": "Psalm 46:10"
-    },
-    {
-        "text": "The fruit of the Spirit is love, joy, peace, forbearance, kindness, goodness, faithfulness, gentleness and self-control.",
-        "source": "Galatians 5:22-23"
-    },
-    {
-        "text": "And we know that in all things God works for the good of those who love him, who have been called according to his purpose.",
-        "source": "Romans 8:28"
-    },
-    {
-        "text": "Your word is a lamp for my feet, a light on my path.",
-        "source": "Psalm 119:105"
-    },
-    {
-        "text": "Come to me, all you who are weary and burdened, and I will give you rest.",
-        "source": "Matthew 11:28"
-    },
-    {
-        "text": "Love is patient, love is kind. It does not envy, it does not boast, it is not proud.",
-        "source": "1 Corinthians 13:4"
-    },
-    {
-        "text": "So do not fear, for I am with you; do not be dismayed, for I am your God. I will strengthen you and help you; I will uphold you with my righteous right hand.",
-        "source": "Isaiah 41:10"
-    },
-    {
-        "text": "Have I not commanded you? Be strong and courageous. Do not be afraid; do not be discouraged, for the Lord your God will be with you wherever you go.",
-        "source": "Joshua 1:9"
-    }
-    # Add more of your favorite verses here...
-]
+def fetch_text() -> str:
+    print(f"⬇️  Downloading KJV from {SOURCE_URL} …")
+    with urlopen(SOURCE_URL) as resp:
+        return resp.read().decode("utf-8", errors="ignore")
 
-def save_quotes_to_json(quotes, filepath):
-    """Saves the list of quotes to a JSON file."""
-    if not quotes:
-        print("No quotes to save.")
-        return
-    try:
-        # Create the directory if it doesn't exist
-        os.makedirs(os.path.dirname(filepath), exist_ok=True)
-        with open(filepath, 'w', encoding='utf-8') as f:
-            json.dump(quotes, f, indent=2, ensure_ascii=False)
-        print(f"Verses successfully saved to: {filepath} ({len(quotes)} verses)")
-    except IOError as e:
-        print(f"Error saving verses to {filepath}: {e}")
+def strip_gutenberg_header(txt: str) -> str:
+    start = txt.find("*** START OF THE PROJECT GUTENBERG EBOOK")
+    end   = txt.find("*** END OF THE PROJECT GUTENBERG EBOOK")
+    return txt[start:end] if start != -1 and end != -1 else txt
+
+_book_re = re.compile(r"^\s*The\s+([A-Z][\w\s]+?)\s*$")
+_verse_re = re.compile(r"^\s*(\d+):(\d+)\s+(.+?)\s*$")
+
+def parse_verses(raw: str):
+    """Yield (book, chapter:verse, text) tuples."""
+    book = None
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        # Book heading line?
+        m_book = _book_re.match(line)
+        if m_book:
+            book = f"The {m_book.group(1).strip()}"
+            continue
+        # Verse line?
+        m_verse = _verse_re.match(line)
+        if m_verse and book:
+            chapter, verse, verse_text = m_verse.groups()
+            ref = f"{chapter}:{verse}"
+            yield book, ref, verse_text
+
+def build_records():
+    raw = fetch_text()
+    raw = strip_gutenberg_header(raw)
+    for book, ref, verse_text in parse_verses(raw):
+        if len(verse_text.split()) > MAX_WORDS:
+            continue            # skip long verses
+        yield {
+            "text"      : verse_text,
+            "source"    : f"{book}, {ref}",
+            "author"    : AUTHOR_STR,
+            "tradition" : TRADITION,
+            "book"      : book,
+            "reference" : ref
+        }
+
+def main():
+    OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    records = list(build_records())
+    print(f"✅  {len(records):,} verses ≤ {MAX_WORDS} words extracted.")
+    with OUT_PATH.open("w", encoding="utf-8") as f:
+        json.dump(records, f, ensure_ascii=False, indent=2)
+    print(f"💾  Saved to {OUT_PATH.relative_to(Path.cwd())}")
 
 if __name__ == "__main__":
-    print("Generating Bible verses JSON file...")
-    save_quotes_to_json(verses, OUTPUT_QUOTES_PATH)
+    main()
