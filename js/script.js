@@ -1,175 +1,78 @@
-// js/script.js
+// js/script.js – cleaned & minimal
 
-// --- GLOBAL CONFIG & STATE ---
-let ALL_QUOTES = [];
-let currentQuoteObjectForToday = null;
-let currentQuoteObjectForYesterday = null;
+/* ---------------- CONFIG --------------- */
+const QUOTE_FILE = 'data/quotes_bible.json';
+const MAX_WORDS = 75;
 
-// --- THEME TOGGLE ---
-function setupThemeToggle() {
-    const themeToggleButton = document.getElementById('theme-toggle-button');
-    const currentTheme = localStorage.getItem('theme');
-    document.body.classList.add(currentTheme || 'light-mode');
+/* ---------------- THEME ---------------- */
+const toggleBtn = document.getElementById('theme-toggle-button');
+const stored = localStorage.getItem('theme');
+document.body.classList.add(stored || 'light-mode');
+toggleBtn.onclick = () => {
+  document.body.classList.toggle('dark-mode');
+  document.body.classList.toggle('light-mode');
+  localStorage.setItem('theme',
+    document.body.classList.contains('dark-mode') ? 'dark-mode' : 'light-mode');
+};
 
-    if (themeToggleButton) {
-        themeToggleButton.addEventListener('click', () => {
-            const isDarkMode = document.body.classList.toggle('dark-mode');
-            document.body.classList.toggle('light-mode', !isDarkMode);
-            localStorage.setItem('theme', isDarkMode ? 'dark-mode' : 'light-mode');
+/* ------------- QUOTE HELPERS ----------- */
+const dayOfYear = d => Math.floor((d - new Date(d.getFullYear(),0,0))/8.64e7);
+const countWords = t => t.trim().split(/\s+/).length;
+
+async function loadQuotes(){
+  const res = await fetch(QUOTE_FILE); return res.ok ? res.json() : [];
+}
+
+function pick(list, idx){return list[idx % list.length];}
+
+/* ------------- RENDERERS --------------- */
+function renderQuote(obj,suffix=''){
+  document.getElementById(`quote-text${suffix}`).textContent = obj.text;
+  document.getElementById(`quote-author${suffix}`).textContent = obj.source;
+}
+function renderDate(d,id){
+  document.getElementById(id).textContent = d.toLocaleDateString(
+    undefined,{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+}
+
+/* ------------- MAIN -------------------- */
+let qToday, qYest;
+
+(async ()=>{
+  const all = (await loadQuotes()).filter(q=>countWords(q.text)<=MAX_WORDS);
+  const now = new Date(), yest = new Date(now);
+  yest.setDate(now.getDate()-1);
+  qToday = pick(all, dayOfYear(now));
+  qYest  = pick(all, dayOfYear(yest));
+  renderQuote(qToday);
+  renderQuote(qYest,'-yesterday');
+  renderDate(now,'gregorianDatePanel');
+})();
+
+/* ------------- EVENTS ------------------ */
+document.getElementById('scroll-down-arrow')
+        .addEventListener('click', e=>{
+          e.preventDefault();
+          document.querySelector('.panel-date')
+                  .scrollIntoView({behavior:'smooth'});
         });
-    }
-}
 
-// --- QUOTE & DATE LOGIC ---
-async function fetchQuotes(fileName = 'data/quotes_bible.json') {
-    try {
-        const response = await fetch(fileName);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return await response.json();
-    } catch (error) {
-        console.error("Could not fetch verses:", error);
-        return [];
-    }
-}
-
-function getDayOfYear(date = new Date()) {
-    const start = new Date(date.getFullYear(), 0, 0);
-    const diff = (date - start) + ((start.getTimezoneOffset() - date.getTimezoneOffset()) * 60 * 1000);
-    const oneDay = 1000 * 60 * 60 * 24;
-    return Math.floor(diff / oneDay);
-}
-
-function getQuoteByDay(quotesArray, dayOfYear) {
-    if (!quotesArray || quotesArray.length === 0) return null;
-    const index = dayOfYear % quotesArray.length;
-    return quotesArray[index];
-}
-
-function displayQuote(quoteObject, type = "today") {
-    const textElId = type === "today" ? 'quote-text' : 'quote-text-yesterday';
-    const authorElId = type === "today" ? 'quote-author' : 'quote-author-yesterday';
-
-    const quoteTextElement = document.getElementById(textElId);
-    const quoteAuthorElement = document.getElementById(authorElId);
-
-    if (type === 'today') currentQuoteObjectForToday = quoteObject;
-    else currentQuoteObjectForYesterday = quoteObject;
-
-    if (quoteTextElement && quoteAuthorElement) {
-        if (quoteObject && quoteObject.text) {
-            quoteTextElement.textContent = quoteObject.text;
-            quoteAuthorElement.textContent = quoteObject.source || 'Unknown Reference';
-        } else {
-            quoteTextElement.textContent = "No verse available for this day.";
-            quoteAuthorElement.textContent = "";
-        }
-    } else {
-        console.error(`Error displaying verse: One or more elements not found for type "${type}"`);
-    }
-}
-
-function displayGregorianDate(date = new Date(), elementId) {
-    const element = document.getElementById(elementId);
-    if (element) {
-        element.textContent = date.toLocaleDateString(undefined, {
-            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+document.getElementById('yesterday-button')
+        .addEventListener('click',e=>{
+          e.preventDefault();
+          const sec=document.getElementById('yesterday-jumbotron-display');
+          sec.style.display='flex';
+          sec.scrollIntoView({behavior:'smooth'});
         });
-    }
-}
 
+document.getElementById('yesterday-arrow')
+        .addEventListener('click',e=>{
+          e.preventDefault();
+          document.getElementById('quote-source-full-yesterday')
+                  .classList.toggle('visible');
+        });
 
-// --- INITIALIZATION & PAGE SETUP ---
-async function initializePage() {
-    ALL_QUOTES = await fetchQuotes(); // Fetches quotes_bible.json by default
-    if (!Array.isArray(ALL_QUOTES) || ALL_QUOTES.length === 0) {
-        displayQuote(null, "today");
-        return;
-    }
-    console.log(`Loaded ${ALL_QUOTES.length} verses for display.`);
-
-    // --- Populate Today's Content ---
-    const todayDateObj = new Date();
-    const dayOfYearToday = getDayOfYear(todayDateObj);
-    const todaysQuote = getQuoteByDay(ALL_QUOTES, dayOfYearToday);
-    displayQuote(todaysQuote, "today");
-    displayGregorianDate(todayDateObj, "gregorianDatePanel");
-}
-
-// --- EVENT HANDLING ---
-function showYesterdaySection() {
-    if (ALL_QUOTES.length === 0) return;
-
-    const yesterdaySection = document.getElementById('yesterday-jumbotron-display');
-    if (!yesterdaySection) return;
-
-    // --- Populate Yesterday's Content ---
-    const today = new Date();
-    const yesterdayDateObj = new Date(today);
-    yesterdayDateObj.setDate(today.getDate() - 1);
-
-    const dayOfYearYesterday = getDayOfYear(yesterdayDateObj);
-    const yesterdaysQuote = getQuoteByDay(ALL_QUOTES, dayOfYearYesterday);
-
-    displayQuote(yesterdaysQuote, "yesterday");
-    displayGregorianDate(yesterdayDateObj, "gregorianDateYesterday");
-
-    // --- Animate and Scroll ---
-    const wasHidden = yesterdaySection.style.display === 'none';
-    if (wasHidden) {
-        yesterdaySection.style.display = 'flex';
-        setTimeout(() => {
-            yesterdaySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 50);
-    } else {
-        yesterdaySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-
-    document.getElementById('yesterday-button')?.classList.add('button-active');
-    document.getElementById('today-button')?.classList.remove('button-active');
-}
-
-function showTodaySection() {
-    document.getElementById('main-jumbotron').scrollIntoView({ behavior: 'smooth' });
-    const yesterdaySection = document.getElementById('yesterday-jumbotron-display');
-    if (yesterdaySection) {
-        yesterdaySection.style.display = 'none';
-    }
-    document.getElementById('today-button')?.classList.add('button-active');
-    document.getElementById('yesterday-button')?.classList.remove('button-active');
-}
-
-function copyQuoteToClipboard(quoteObj) {
-    if (quoteObj && quoteObj.text) {
-        let textToCopy = `${quoteObj.text}\n— ${quoteObj.source}`;
-        navigator.clipboard.writeText(textToCopy.trim()).then(() => {
-            alert("Verse copied to clipboard!");
-        }).catch(err => console.error('Failed to copy text: ', err));
-    }
-}
-
-function setupEventListeners() {
-    document.getElementById('today-button')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        showTodaySection();
-    });
-
-    document.getElementById('yesterday-button')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        showYesterdaySection();
-    });
-
-    document.getElementById('scroll-down-arrow')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        document.querySelector(e.currentTarget.getAttribute('href')).scrollIntoView({ behavior: 'smooth' });
-    });
-
-    document.getElementById('quote-text')?.addEventListener('click', () => copyQuoteToClipboard(currentQuoteObjectForToday));
-    document.getElementById('quote-text-yesterday')?.addEventListener('click', () => copyQuoteToClipboard(currentQuoteObjectForYesterday));
-}
-
-// --- DOM Ready ---
-document.addEventListener('DOMContentLoaded', async () => {
-    setupThemeToggle();
-    await initializePage();
-    setupEventListeners();
-});
+document.getElementById('quote-text')
+        .onclick = ()=>navigator.clipboard.writeText(`${qToday.text}\n— ${qToday.source}`);
+document.getElementById('quote-text-yesterday')
+        .onclick = ()=>navigator.clipboard.writeText(`${qYest.text}\n— ${qYest.source}`);
