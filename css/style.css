@@ -32,12 +32,14 @@ body.dark-mode .icon-moon{display:none}
   min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;
   padding:40px 20px;background:var(--bg)}
 .quote-content-wrapper{max-width:700px;width:90%;text-align:left}
+
+/* Updated quote & author */
 #quote-text,#quote-text-yesterday{
-  font-family:'Source Serif Pro',serif;font-size:1.5em;line-height:1.55;
-  margin-bottom:1.5em;cursor:pointer}
+  font-family:'Source Serif Pro',serif;font-size:1.8em;font-weight:400;line-height:1.6;
+  margin-bottom:1.7em;cursor:pointer;white-space:pre-line}
 #quote-author,#quote-author-yesterday{
-  font-size:1.4em;color:var(--fg-light)}
-/* arrow left */
+  font-family:'Source Sans Pro',sans-serif;font-size:1.2em;font-weight:600;color:var(--fg-light)}
+
 .scroll-down-arrow{
   position:absolute;bottom:5vh;left:20px;opacity:.5;cursor:pointer;transition:opacity .25s}
 .scroll-down-arrow img{width:24px;filter:var(--arrow-filter)}
@@ -46,34 +48,45 @@ body.dark-mode .icon-moon{display:none}
 /* ------------------ PANELS --------------------------- */
 .panel-content-constrained{max-width:700px;margin:0 auto;padding:0 20px}
 .panel-citation{padding:2.5vh 0 12vh;text-align:center}
-#quote-source-full{font-size:1.4em;color:var(--fg-light)}
+#quote-source-full{font-size:1.35em;color:var(--fg-light)}
 
+/* DATE PANEL – enlarged font */
 .panel-date{background:var(--panel-bg);color:var(--panel-fg);padding:20px 0;text-align:center}
-.date-text{font-size:1em}
+.date-text{font-size:1.2em;font-weight:400}
 
 .panel-buttons{background:var(--panel-bg);color:var(--panel-fg)}
 .panel-buttons-yesterday{padding:27px 0}
 .buttons-layout-centered{display:flex;justify-content:center}
+
+/* Improved Yesterday button */
 .button{
   border:2px solid var(--panel-fg);background:transparent;color:var(--panel-fg);
-  padding:.9em 1.4em;font-size:1em;border-radius:3px;min-width:120px;
-  transition:background .25s}
-.button:hover{background:rgba(255,255,255,.1)}
+  padding:1em 1.6em;font-size:1.05em;border-radius:3px;min-width:140px;
+  transition:background .25s,border-color .25s}
+.button:hover{background:rgba(255,255,255,.12)}
+.button:active{transform:scale(.97)}
+.button-active{background:var(--panel-fg);color:var(--panel-bg)}
 
-/* ------------------ YESTERDAY ARROW & CITATION ------- */
+/* ------------------ YESTERDAY EXTRAS ----------------- */
 .toggle-citation-arrow{
-  margin:12vh 0 0 auto;opacity:.5;cursor:pointer;transition:opacity .25s}
+  margin:12vh 0 0;opacity:.5;cursor:pointer;transition:opacity .25s}
 .toggle-citation-arrow img{width:24px;filter:var(--arrow-filter)}
 .toggle-citation-arrow:hover{opacity:.8}
 .yesterday-citation{
-  font-size:1.4em;color:var(--fg-light);text-align:center;
+  font-size:1.35em;color:var(--fg-light);text-align:center;
   margin:7.5vh auto 12vh;opacity:0;max-height:0;overflow:hidden;
   transition:opacity .3s,max-height .3s}
 .yesterday-citation.visible{opacity:.9;max-height:5em}
 
 /* ------------------ MOBILE --------------------------- */
-@media(max-width:768px){body{font-size:13.5px}}
+@media(max-width:768px){
+  body{font-size:13.5px}
+  .panel-date{padding:15px 0}
+  .panel-buttons-yesterday{padding:22px 0}
+}
 @media(max-width:480px){
   body{font-size:13px}
   .buttons-layout-centered{flex-direction:column;gap:10px}
+  .panel-date{padding:12px 0}
+  .panel-buttons-yesterday{padding:18px 0}
 }
