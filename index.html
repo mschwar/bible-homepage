@@ -10,6 +10,12 @@
 </head>
 <body class="light-mode">
 
+    <!-- Floating theme toggle -->
+    <button id="theme-toggle-button" class="theme-toggle-floating" aria-label="Toggle light/dark theme">
+        <span class="icon-sun">☀️</span>
+        <span class="icon-moon">🌙</span>
+    </button>
+
     <main class="quote-jumbotron" id="main-jumbotron">
         <div class="quote-content-wrapper">
             <h1 id="quote-text" title="Click to copy verse">Loading Daily Verse...</h1>
@@ -39,12 +45,6 @@
             <div class="panel-content-constrained">
                 <h1 class="info-panel-title">Daily Verse</h1>
                 <p id="gregorianDatePanel" class="date-text visible"></p>
-                <div class="theme-toggle-container-subtle">
-                    <button id="theme-toggle-button" aria-label="Toggle light/dark theme">
-                        <span class="icon-sun">☀️</span>
-                        <span class="icon-moon">🌙</span>
-                    </button>
-                </div>
             </div>
         </div>
 
@@ -62,7 +62,6 @@
                     <h2 id="quote-author-yesterday"></h2>
                 </div>
             </div>
-            <!-- This section contains the date for yesterday's verse -->
             <div class="scrollable-content" style="margin-top: 5vh; width:100%;">
                  <div class="panel-info" style="padding: calc(30px * 1.61) 0;">
                      <div class="panel-content-constrained">
